@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<accessibility-service android:description="@string/accessibility_service_description"
+    android:packageNames="com.example.skyplungerbot"
+    android:accessibilityEventTypes="typeWindowContentChanged|typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="true"
+    android:notificationTimeout="100"
+    android:accessibilityFlags="flagDefault"
+    xmlns:android="http://schemas.android.com/apk/res/android" />
