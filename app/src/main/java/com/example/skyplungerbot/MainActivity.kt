@@ -13,30 +13,28 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.example.skyplungerbot.service.FloatingViewService
 import com.example.skyplungerbot.service.GameAutomatorService
+import com.example.skyplungerbot.util.MediaProjectionHolder
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mediaProjectionManager: MediaProjectionManager
 
-    // 请求悬浮窗权限（使用 ActivityResultContracts）
+    // 请求悬浮窗权限的 ActivityResultLauncher
     private val overlayPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        // 当用户授权悬浮窗权限后启动 FloatingViewService
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.canDrawOverlays(this)) {
-            startService(Intent(this, FloatingViewService::class.java))
+        if (Settings.canDrawOverlays(this)) {
+            Log.d("MainActivity", "悬浮窗权限已授权")
         }
     }
 
-    // 请求屏幕捕获权限，注意不在这里调用 getMediaProjection()，而是将返回数据传给服务
+    // 请求屏幕捕获权限的 ActivityResultLauncher
     private val screenCaptureLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            // 将屏幕捕获结果通过 Intent Extra 传递给 GameAutomatorService
-            val intent = Intent(this, GameAutomatorService::class.java)
-            intent.putExtra("screen_capture_result_code", result.resultCode)
-            intent.putExtra("screen_capture_data", result.data)
-            startService(intent)
+            val mp = mediaProjectionManager.getMediaProjection(result.resultCode, result.data!!)
+            MediaProjectionHolder.mediaProjection = mp
+            Log.d("MainActivity", "MediaProjection 获取成功")
         } else {
             Log.e("MainActivity", "屏幕捕获权限未获得")
         }
@@ -46,22 +44,26 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 请求悬浮窗权限
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+        // 1. 请求悬浮窗权限
+        if (!Settings.canDrawOverlays(this)) {
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:$packageName")
             )
             overlayPermissionLauncher.launch(intent)
-        } else {
-            startService(Intent(this, FloatingViewService::class.java))
         }
 
-        // 初始化 MediaProjectionManager
+        // 2. 启动 FloatingViewService 用于显示悬浮窗口（用于控制启动/停止 GameAutomatorService）
+        startService(Intent(this, FloatingViewService::class.java))
+
+        // 3. 启动 GameAutomatorService（注意：GameAutomatorService 必须在 onServiceConnected() 中调用 startForeground()）
+        startService(Intent(this, GameAutomatorService::class.java))
+
+        // 4. 请求屏幕捕获权限（此时 GameAutomatorService 已经启动并作为前台服务运行）
         mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        // 请求屏幕捕获权限
         val captureIntent = mediaProjectionManager.createScreenCaptureIntent()
         screenCaptureLauncher.launch(captureIntent)
     }
 }
+
 
